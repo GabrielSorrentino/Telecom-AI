@@ -1,19 +1,17 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px
-import plotly.graph_objects as go
 from modelo_service import preparar_datos_ml
 
 def mostrar_matriz_correlacion(X, y):
-    """Muestra la matriz de correlación de las variables"""
+    """Genera la matriz de correlación de las variables"""
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
     
     sns.set_theme(style='white')
     corr_matrix = df_temp.corr()
     
-    plt.figure(figsize=(18, 12))
+    fig, ax = plt.subplots(figsize=(18, 12))
     sns.heatmap(
         corr_matrix,
         annot=True,
@@ -21,32 +19,34 @@ def mostrar_matriz_correlacion(X, y):
         cmap='coolwarm',
         center=0,
         linewidths=0.5,
-        annot_kws={'size': 10}
+        annot_kws={'size': 10},
+        ax=ax
     )
-    plt.title('Matriz de Correlación de las Variables', fontsize=16)
+    ax.set_title('Matriz de Correlación de las Variables', fontsize=16)
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.show()
     
     print('Correlación con la Cancelación (churn):')
     print(corr_matrix['canceloServicio'].sort_values(ascending=False))
     
-    return corr_matrix
+    return fig, corr_matrix
 
 def boxplot_estandarizado(X, y, columna_floats, titulo=None):
     """Genera un boxplot de una variable numérica estandarizada vs cancelación"""
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
     
-    plt.figure(figsize=(8, 6))
-    sns.boxplot(x='canceloServicio', y=columna_floats, data=df_temp, palette='Set2')
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.boxplot(x='canceloServicio', y=columna_floats, data=df_temp, palette='Set2', ax=ax)
     
     if titulo is None:
         titulo = f'Relación entre {columna_floats} (Estandarizado) y Cancelación'
-    plt.title(titulo)
-    plt.xlabel('¿Canceló? (0 = No, 1 = Sí)')
-    plt.ylabel(f'{columna_floats} (Escalado)')
-    plt.show()
+    ax.set_title(titulo)
+    ax.set_xlabel('¿Canceló? (0 = No, 1 = Sí)')
+    ax.set_ylabel(f'{columna_floats} (Escalado)')
+    plt.tight_layout()
+    
+    return fig
 
 def boxplot_cuentas_mensuales(X, y):
     """Boxplot de cuentas mensuales vs cancelación"""
@@ -61,19 +61,22 @@ def scatter_antiguedad_vs_cuentas(X, y):
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
     
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
     sns.scatterplot(
         x='antiguedadEnMeses', 
         y='cuentasMensuales',
         hue=df_temp['canceloServicio'].map({0: 'No', 1: 'Sí'}), 
         data=df_temp, 
-        alpha=0.5
+        alpha=0.5,
+        ax=ax
     )
-    plt.title('Tendencia de Cancelación: Antigüedad vs. Cuentas Mensuales')
-    plt.xlabel('Antigüedad (meses)')
-    plt.ylabel('Cuentas mensuales')
-    plt.legend(title='Cancelación')
-    plt.show()
+    ax.set_title('Tendencia de Cancelación: Antigüedad vs. Cuentas Mensuales')
+    ax.set_xlabel('Antigüedad (meses)')
+    ax.set_ylabel('Cuentas mensuales')
+    ax.legend(title='Cancelación')
+    plt.tight_layout()
+    
+    return fig
 
 def histograma_cancelacion_general():
     """Histograma general de distribución de cancelación"""
@@ -114,7 +117,7 @@ def graficos_costos_cancelacion():
     return graficos
 
 def mostrar_importancia_variables(model, X, nombre_modelo):
-    """Muestra la importancia de las variables para el modelo"""
+    """Genera gráfico de importancia de variables para el modelo"""
     if hasattr(model, 'feature_importances_'):
         # Para Random Forest
         importancia = pd.DataFrame({
@@ -122,15 +125,16 @@ def mostrar_importancia_variables(model, X, nombre_modelo):
             'Importancia': model.feature_importances_
         }).sort_values('Importancia', ascending=False)
         
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Importancia', y='Variable', data=importancia.head(10))
-        plt.title(f'Importancia de Variables - {nombre_modelo}')
-        plt.xlabel('Importancia')
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.barplot(x='Importancia', y='Variable', data=importancia.head(10), ax=ax)
+        ax.set_title(f'Importancia de Variables - {nombre_modelo}')
+        ax.set_xlabel('Importancia')
         plt.tight_layout()
-        plt.show()
         
         print(f"\nImportancia de variables - {nombre_modelo}:")
         print(importancia)
+        
+        return fig, importancia
         
     elif hasattr(model, 'coef_'):
         # Para Regresión Logística
@@ -139,70 +143,51 @@ def mostrar_importancia_variables(model, X, nombre_modelo):
             'Coeficiente': model.coef_[0]
         }).sort_values('Coeficiente', key=abs, ascending=False)
         
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Coeficiente', y='Variable', data=coeficientes.head(10))
-        plt.title(f'Coeficientes del Modelo - {nombre_modelo}')
-        plt.xlabel('Coeficiente')
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.barplot(x='Coeficiente', y='Variable', data=coeficientes.head(10), ax=ax)
+        ax.set_title(f'Coeficientes del Modelo - {nombre_modelo}')
+        ax.set_xlabel('Coeficiente')
         plt.tight_layout()
-        plt.show()
         
         print(f"\nCoeficientes del modelo - {nombre_modelo}:")
         print(coeficientes)
-    
-    return importancia if hasattr(model, 'feature_importances_') else coeficientes
+        
+        return fig, coeficientes
 
 def matriz_confusion_visual(y_test, y_pred, nombre_modelo):
-    """Muestra una matriz de confusión visual"""
+    """Genera una matriz de confusión visual"""
     from sklearn.metrics import confusion_matrix
     
     cm = confusion_matrix(y_test, y_pred)
     
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
-    plt.title(f'Matriz de Confusión - {nombre_modelo}')
-    plt.xlabel('Predicción')
-    plt.ylabel('Realidad')
-    plt.xticks([0.5, 1.5], ['No Canceló', 'Canceló'])
-    plt.yticks([0.5, 1.5], ['No Canceló', 'Canceló'])
-    plt.show()
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False, ax=ax)
+    ax.set_title(f'Matriz de Confusión - {nombre_modelo}')
+    ax.set_xlabel('Predicción')
+    ax.set_ylabel('Realidad')
+    ax.set_xticks([0.5, 1.5])
+    ax.set_xticklabels(['No Canceló', 'Canceló'])
+    ax.set_yticks([0.5, 1.5])
+    ax.set_yticklabels(['No Canceló', 'Canceló'])
+    plt.tight_layout()
     
-    return cm
+    return fig, cm
 
 def dashboard_completo():
-    """Genera un dashboard completo con todas las visualizaciones principales"""
+    """Genera resumen del dashboard sin mostrar gráficos automáticamente"""
     print("=== Generando Dashboard Completo ===\n")
     
     # Preparar datos
     X, y = preparar_datos_ml()
     
-    # 1. Matriz de correlación
-    print("1. Matriz de Correlación")
-    mostrar_matriz_correlacion(X, y)
-    
-    # 2. Distribución general de cancelación
-    print("\n2. Distribución General de Cancelación")
-    histograma_cancelacion_general()
-    
-    # 3. Boxplots
-    print("\n3. Boxplots de Variables Numéricas")
-    boxplot_cuentas_mensuales(X, y)
-    boxplot_antiguedad(X, y)
-    
-    # 4. Scatter plot
-    print("\n4. Scatter Plot: Antigüedad vs Cuentas Mensuales")
-    scatter_antiguedad_vs_cuentas(X, y)
-    
-    # 5. Gráficos categóricos
-    print("\n5. Gráficos Categóricos")
-    graficos_cat = graficos_categoricos_cancelacion()
-    
-    # 6. Gráficos de costos
-    print("\n6. Gráficos de Costos")
-    graficos_cost = graficos_costos_cancelacion()
+    # Solo generar resumen sin mostrar gráficos automáticamente
+    print("Datos preparados para dashboard:")
+    print(f"- Variables: {X.shape[1]}")
+    print(f"- Registros: {X.shape[0]}")
+    print(f"- Balance de clases: {y.value_counts().to_dict()}")
     
     return {
         'X': X,
         'y': y,
-        'graficos_categoricos': graficos_cat,
-        'graficos_costos': graficos_cost
+        'mensaje': 'Dashboard preparado. Use las funciones individuales para visualizar gráficos específicos.'
     }

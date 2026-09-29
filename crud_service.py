@@ -1,22 +1,29 @@
 import csv
 import os
+import shutil
 
-FILE_NAME = 'Telecom_AI.csv'
+FILE_BASE = 'Telecom_base.csv'
+FILE_TRABAJO = 'Telecom_AI.csv'
 FIELD_NAMES = ['ID', 'canceloServicio', 'genero', 'jubiladoMasDeSesenta', 'conPareja', 'conDependientes', 'antiguedadEnMeses', 'servicioTelefonico', 'servicioDeInternet', 'seguridadEnLinea', 'copiaDeSeguridadEnLinea', 'proteccionDeDispositivos', 'soporteTecnico', 'streamingTV', 'streamingDePeliculas', 'tipoDeContrato', 'tieneFacturaElectronica', 'metodoDePago', 'cuentasMensuales', 'cobroTotal']
 
-def crear_csv_si_no_existe():
-    if not os.path.exists(FILE_NAME):
-        with open(FILE_NAME, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELD_NAMES)
-            writer.writeheader()
+def inicializar_csv_trabajo():
+    """Inicializa el CSV de trabajo desde el archivo base"""
+    if not os.path.exists(FILE_BASE):
+        raise FileNotFoundError(f"El archivo base {FILE_BASE} no existe")
+    
+    if not os.path.exists(FILE_TRABAJO):
+        shutil.copy2(FILE_BASE, FILE_TRABAJO)
+        print(f"CSV de trabajo creado desde {FILE_BASE}")
+    else:
+        print(f"Usando CSV de trabajo existente: {FILE_TRABAJO}")
 
 def obtener_datos():
-    with open(FILE_NAME, 'r', newline='') as f:
+    with open(FILE_TRABAJO, 'r', newline='') as f:
         reader = csv.DictReader(f)
         return list(reader)
 
 def crear_registro(data):
-    with open(FILE_NAME, 'a', newline='') as f:
+    with open(FILE_TRABAJO, 'a', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=FIELD_NAMES)
         writer.writerow(data)
 
@@ -39,7 +46,7 @@ def actualizar_registro(id_registro, nuevos_datos):
         registros_actualizados.append(registro)
     
     if encontrado:
-        with open(FILE_NAME, 'w', newline='') as f:
+        with open(FILE_TRABAJO, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=FIELD_NAMES)
             writer.writeheader()
             writer.writerows(registros_actualizados)
@@ -51,7 +58,7 @@ def eliminar_registro(id_registro):
     registros_filtrados = [reg for reg in datos if reg['ID'] != id_registro]
     
     if len(registros_filtrados) < len(datos):
-        with open(FILE_NAME, 'w', newline='') as f:
+        with open(FILE_TRABAJO, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=FIELD_NAMES)
             writer.writeheader()
             writer.writerows(registros_filtrados)

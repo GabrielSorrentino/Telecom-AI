@@ -8,13 +8,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import seaborn as sns
+from crud_service import FILE_TRABAJO
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
 def obtener_dataframe_procesado():
     """Lee el CSV y realiza el preprocesamiento inicial para ML"""
-    df = pd.read_csv('Telecom_AI.csv')
+    df = pd.read_csv(FILE_TRABAJO)
     
     # Eliminar columnas irrelevantes
     df = df.drop(columns=['ID'])
@@ -134,26 +135,11 @@ def evaluar_modelo(model, X_test, y_test, nombre_modelo):
     }
 
 def obtener_correlaciones(X, y):
-    """Calcula y muestra la matriz de correlación"""
+    """Calcula la matriz de correlación sin mostrar gráficos"""
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
     
     corr_matrix = df_temp.corr()
-    
-    plt.figure(figsize=(18, 12))
-    sns.heatmap(
-        corr_matrix,
-        annot=True,
-        fmt='.2f',
-        cmap='coolwarm',
-        center=0,
-        linewidths=0.5,
-        annot_kws={'size': 10}
-    )
-    plt.title('Matriz de Correlación de las Variables', fontsize=16)
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.show()
     
     print('Correlación con la Cancelación (churn):')
     print(corr_matrix['canceloServicio'].sort_values(ascending=False))
