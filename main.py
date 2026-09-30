@@ -60,7 +60,7 @@ class TelecomAIApp:
     def on_closing(self):
         """Maneja el cierre de la aplicación de forma inmediata"""
         # 1. Cerrar todas las ventanas hijas (top level) con manejo robusto
-        for widget in list(self.root.winfo_children()):
+        for widget in self.root.winfo_children():
             if isinstance(widget, tk.Toplevel):
                 try:
                     widget.destroy()
@@ -72,8 +72,8 @@ class TelecomAIApp:
         # 2. Cerrar todas las figuras de matplotlib abiertas
         try:
             plt.close('all')
-        except:
-            pass
+        except Exception:
+            pass  # Ignorar errores al cerrar figuras matplotlib
         
         # 3. Destruir la ventana principal inmediatamente
         self.root.destroy()

@@ -26,16 +26,38 @@ El repositorio contiene los siguientes módulos principales:
 
 Para ejecutar la aplicación se necesita:
 
-- Python 3.7 o superior
+### Para ejecución directa (con Python instalado y dependencias)
+
+- [Git](https://git-scm.com/downloads)
+- [Python 3.7+](https://www.python.org/downloads/)
+- pip (incluido en instalación de Python)
 - Las librerías especificadas en `requirements.txt`:
   - pandas
   - matplotlib
   - seaborn
-  - plotly
   - scikit-learn
   - numpy
+  - Dependencias de requirements.txt
+- (Recomendado) Virtual environment (venv o conda)
+
+**Otros requisitos por Sistema Operativo:**
+- **Linux**: tkinter (`sudo apt-get install python3-tk` o equivalente)
+- **Windows/macOS**: tkinter incluido en instalación de Python
+
+### Para ejecución con Docker y X11 (sin Python instalado)
+
+- [Git](https://git-scm.com/downloads)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (Windows/macOS/algunas distros Linux) o [Docker CE](https://docs.docker.com/engine/install/) (Linux)
+- X11
+
+**Requisitos por sistema operativo:**
+- **Linux**: X11 nativo (generalmente incluido por defecto)
+- **macOS**: [XQuartz](https://www.xquartz.org/) para soporte gráfico
+- **Windows**: [Xming](https://sourceforge.net/projects/xming/) o [VcXsrv](https://sourceforge.net/projects/vcxsrv/) para soporte gráfico + X11 forwarding en Docker Desktop
 
 ## Instalación y Ejecución
+
+### Opción 1: Ejecución Directa
 
 1. **Clonar el repositorio** (si aún no lo has hecho):
    ```bash
@@ -48,10 +70,65 @@ Para ejecutar la aplicación se necesita:
    pip install -r requirements.txt
    ```
 
-3. **Ejecutar la aplicación**:
+3. **Instalar tkinter** (solo en Linux):
+   ```bash
+   sudo apt-get install python3-tk  # Debian/Ubuntu
+   # o
+   sudo dnf install python3-tkinter  # Fedora
+   ```
+
+4. **Ejecutar la aplicación**:
    ```bash
    python3 main.py
    ```
+
+### Opción 2: Ejecución con Docker
+
+Se pueden usar los scripts techmind.sh (en Linux/macOS) o techmind.ps1 (en Windows) para ejecutar la aplicación con Docker; o bien se puede construir y ejecutar el contenedor de la aplicación manualmente.
+
+#### Ejecución en Linux/macOS
+
+```bash
+# Dar permisos de ejecución al script
+chmod +x telecom.sh
+
+# Ejecutar la aplicación
+./telecom.sh
+```
+
+El script automáticamente:
+- Detecta tu sistema operativo
+- Configura X11 forwarding para la interfaz gráfica
+- Construye la imagen desde el Dockerfile
+- Ejecuta el contenedor de forma autodestruible
+
+#### Ejecución en Windows (PowerShell)
+
+```powershell
+# Ejecutar con PowerShell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\telecom.ps1
+```
+
+**Nota importante para Windows**: Asegúrate de que Xming/VcXsrv esté ejecutándose antes de ejecutar el script, y que X11 forwarding esté habilitado en la configuración de Docker Desktop.
+
+#### Construcción Manual de Docker
+
+Si prefieres construir y ejecutar manualmente:
+
+```bash
+# Construir la imagen
+docker build -t telecom-ai:latest .
+
+# Ejecutar el contenedor (Linux/macOS)
+# La línea `--user $(id -u):$(id -g)` es innecesaria en Windows o macOS, pero conviene en Linux para que el contenedor no dependa de root
+docker run --rm \
+    --user $(id -u):$(id -g) \
+    --env DISPLAY=$DISPLAY \
+    --volume /tmp/.X11-unix:/tmp/.X11-unix \
+    --volume $(pwd):/app \
+    telecom-ai:latest
+```
 
 ## Funcionalidades de la Aplicación
 
