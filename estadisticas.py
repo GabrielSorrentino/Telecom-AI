@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from crud_service import obtener_datos, FILE_TRABAJO
+from nombres_variables import renombrar_columnas_dataframe
 
 # Constantes para etiquetas de gráficos
 LABEL_CANCELADO = 'Canceló'
@@ -15,7 +16,9 @@ def obtener_dataframe():
 
 def analisis_descriptivo():
     df = obtener_dataframe()
-    return df.describe()
+    # Renombrar columnas a nombres amigables
+    df_renombrado = renombrar_columnas_dataframe(df, es_procesado=False)
+    return df_renombrado.describe()
 
 def distribucion_cancelacion():
     """Genera gráfico de distribución de cancelación"""

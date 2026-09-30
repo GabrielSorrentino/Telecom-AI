@@ -2,11 +2,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from modelo_service import preparar_datos_ml
+from nombres_variables import renombrar_columnas_dataframe
 
 def mostrar_matriz_correlacion(X, y):
     """Genera la matriz de correlación de las variables"""
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
+    
+    # Renombrar columnas a nombres amigables (variables procesadas)
+    df_temp = renombrar_columnas_dataframe(df_temp, es_procesado=True)
     
     sns.set_theme(style='white')
     corr_matrix = df_temp.corr()
@@ -24,42 +28,58 @@ def mostrar_matriz_correlacion(X, y):
     )
     ax.set_title('Matriz de Correlación de las Variables', fontsize=16)
     plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
     plt.tight_layout()
     
     print('Correlación con la Cancelación (churn):')
-    print(corr_matrix['canceloServicio'].sort_values(ascending=False))
+    print(corr_matrix['Canceló el servicio'].sort_values(ascending=False))
     
     return fig, corr_matrix
 
 def boxplot_estandarizado(X, y, columna_floats, titulo=None):
     """Genera un boxplot de una variable numérica estandarizada vs cancelación"""
+    from nombres_variables import obtener_nombre_amigable
+    
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
+    
+    # Obtener nombre amigable para la columna
+    nombre_amigable = obtener_nombre_amigable(columna_floats, es_procesada=True)
     
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.boxplot(x='canceloServicio', y=columna_floats, data=df_temp, palette='Set2', ax=ax)
     
     if titulo is None:
-        titulo = f'Relación entre {columna_floats} (Estandarizado) y Cancelación'
+        titulo = f'Relación entre {nombre_amigable} (Estandarizado) y Cancelación'
     ax.set_title(titulo)
     ax.set_xlabel('¿Canceló? (0 = No, 1 = Sí)')
-    ax.set_ylabel(f'{columna_floats} (Escalado)')
+    ax.set_ylabel(f'{nombre_amigable} (Escalado)')
     plt.tight_layout()
     
     return fig
 
 def boxplot_cuentas_mensuales(X, y):
     """Boxplot de cuentas mensuales vs cancelación"""
-    return boxplot_estandarizado(X, y, 'cuentasMensuales', 'Relación entre Cuentas Mensuales (Estandarizado) y Cancelación')
+    from nombres_variables import obtener_nombre_amigable
+    nombre_amigable = obtener_nombre_amigable('cuentasMensuales', es_procesada=True)
+    return boxplot_estandarizado(X, y, 'cuentasMensuales', f'Relación entre {nombre_amigable} (Estandarizado) y Cancelación')
 
 def boxplot_antiguedad(X, y):
     """Boxplot de antigüedad vs cancelación"""
-    return boxplot_estandarizado(X, y, 'antiguedadEnMeses', 'Relación entre Antigüedad (Estandarizado) y Cancelación')
+    from nombres_variables import obtener_nombre_amigable
+    nombre_amigable = obtener_nombre_amigable('antiguedadEnMeses', es_procesada=True)
+    return boxplot_estandarizado(X, y, 'antiguedadEnMeses', f'Relación entre {nombre_amigable} (Estandarizado) y Cancelación')
 
 def scatter_antiguedad_vs_cuentas(X, y):
     """Diagrama de dispersión de antigüedad vs cuentas mensuales coloreado por cancelación"""
+    from nombres_variables import obtener_nombre_amigable
+    
     df_temp = X.copy()
     df_temp['canceloServicio'] = y
+    
+    # Obtener nombres amigables
+    nombre_antiguedad = obtener_nombre_amigable('antiguedadEnMeses', es_procesada=True)
+    nombre_cuentas = obtener_nombre_amigable('cuentasMensuales', es_procesada=True)
     
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.scatterplot(
@@ -70,9 +90,9 @@ def scatter_antiguedad_vs_cuentas(X, y):
         alpha=0.5,
         ax=ax
     )
-    ax.set_title('Tendencia de Cancelación: Antigüedad vs. Cuentas Mensuales')
-    ax.set_xlabel('Antigüedad (meses)')
-    ax.set_ylabel('Cuentas mensuales')
+    ax.set_title(f'Tendencia de Cancelación: {nombre_antiguedad} vs. {nombre_cuentas}')
+    ax.set_xlabel(nombre_antiguedad)
+    ax.set_ylabel(nombre_cuentas)
     ax.legend(title='Cancelación')
     plt.tight_layout()
     
@@ -118,12 +138,16 @@ def graficos_costos_cancelacion():
 
 def mostrar_importancia_variables(model, X, nombre_modelo):
     """Genera gráfico de importancia de variables para el modelo"""
+    from nombres_variables import obtener_nombre_amigable
+    
     if hasattr(model, 'feature_importances_'):
-        # Para Random Forest
         importancia = pd.DataFrame({
             'Variable': X.columns,
             'Importancia': model.feature_importances_
         }).sort_values('Importancia', ascending=False)
+        
+        # Renombrar variables a nombres amigables
+        importancia['Variable'] = importancia['Variable'].apply(lambda x: obtener_nombre_amigable(x, es_procesada=True))
         
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='Importancia', y='Variable', data=importancia.head(10), ax=ax)
@@ -142,6 +166,9 @@ def mostrar_importancia_variables(model, X, nombre_modelo):
             'Variable': X.columns,
             'Coeficiente': model.coef_[0]
         }).sort_values('Coeficiente', key=abs, ascending=False)
+        
+        # Renombrar variables a nombres amigables
+        coeficientes['Variable'] = coeficientes['Variable'].apply(lambda x: obtener_nombre_amigable(x, es_procesada=True))
         
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='Coeficiente', y='Variable', data=coeficientes.head(10), ax=ax)

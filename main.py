@@ -16,15 +16,21 @@ from estadisticas import (
     grafico_cancelacion_por_jubilado, grafico_cancelacion_por_internet,
     grafico_cancelacion_por_costo_mensual, grafico_cancelacion_por_cobro_total
 )
-from modelo_service import ejecutar_pipeline_completo
+from modelo_service import ejecutar_pipeline_completo, formatear_reporte_pipeline, N_FOLDS
+from nombres_variables import obtener_nombre_amigable
 import threading
 
 # Constantes para mensajes
 INFO_TITLE = "Información"
+SUCCESS_TITLE = "Éxito"
+
+# Constantes para métricas
+SENSIBILIDAD_RECALL = "Sensibilidad (Recall)"
 
 # Constantes para modelos
 MODELO_REGRESION_LOGISTICA = "Regresión Logística"
 MODELO_RANDOM_FOREST = "Random Forest"
+MODELO_XGBOOST = "XGBoost"
 
 # Constantes para etiquetas de gráficos
 LABEL_CANCELADO = "Canceló"
@@ -206,10 +212,18 @@ class TelecomAIApp:
         model_scrollbar.pack(side='right', fill='y')
         
     # Métodos de gestión de datos
-    def _formatear_valor(self, valor):
+    def _formatear_valor(self, valor, columna):
         """Formatea un valor para mostrar en la tabla"""
+        if columna in ['cuentasMensuales', 'cobroTotal']:
+            try:
+                valor_float = float(valor)
+                return f'${valor_float:.2f}'
+            except (ValueError, TypeError):
+                return str(valor)
         if isinstance(valor, bool):
             return 'Sí' if valor else 'No'
+        if valor in ['True', 'False']:
+            return 'Sí' if valor == 'True' else 'No'
         return str(valor)
     
     def _registro_a_valores(self, registro):
@@ -217,7 +231,7 @@ class TelecomAIApp:
         valores = []
         for col in self.nombres_columnas.keys():
             valor = registro.get(col, '')
-            valores.append(self._formatear_valor(valor))
+            valores.append(self._formatear_valor(valor, col))
         return valores
     
     def _limpiar_treeview(self):
@@ -267,13 +281,20 @@ class TelecomAIApp:
     
     def crear_registro_gui(self):
         """Interfaz para crear un nuevo registro"""
-        messagebox.showinfo(INFO_TITLE, "Función de crear registro - Para crear un registro manualmente, editar el CSV directamente")
+        self._ventana_registro(modo='crear')
     
     def actualizar_registro_gui(self):
         """Interfaz para actualizar un registro"""
         id_actualizar = simpledialog.askstring("Actualizar", "Ingrese el ID del cliente a actualizar:")
-        if id_actualizar:
-            messagebox.showinfo(INFO_TITLE, f"Función de actualizar registro para ID: {id_actualizar}\nImplementación pendiente - editar CSV directamente")
+        if not id_actualizar:
+            return
+        
+        registro = leer_registro(id_actualizar)
+        if not registro:
+            messagebox.showwarning("No encontrado", f"No se encontró registro con ID: {id_actualizar}")
+            return
+        
+        self._ventana_registro(modo='actualizar', registro_existente=registro, id_registro=id_actualizar)
     
     def eliminar_registro_gui(self):
         """Interfaz para eliminar un registro"""
@@ -281,12 +302,161 @@ class TelecomAIApp:
         if id_eliminar:
             try:
                 if eliminar_registro(id_eliminar):
-                    messagebox.showinfo("Éxito", f"Registro con ID {id_eliminar} eliminado correctamente")
+                    messagebox.showinfo(SUCCESS_TITLE, f"Registro con ID {id_eliminar} eliminado correctamente")
                     self.ver_todos_datos()
                 else:
                     messagebox.showwarning("Advertencia", f"No se encontró registro con ID: {id_eliminar}")
             except Exception as e:
                 messagebox.showerror("Error", f"Error al eliminar: {str(e)}")
+    
+    def _obtener_configuracion_campos(self, modo):
+        """Obtiene la configuración de campos para el formulario"""
+        return {
+            'ID': {'tipo': 'texto', 'editable': modo == 'crear'},
+            'canceloServicio': {'tipo': 'booleano'},
+            'genero': {'tipo': 'opcion', 'opciones': ['Masculino', 'Femenino']},
+            'jubiladoMasDeSesenta': {'tipo': 'booleano'},
+            'conPareja': {'tipo': 'booleano'},
+            'conDependientes': {'tipo': 'booleano'},
+            'antiguedadEnMeses': {'tipo': 'numero'},
+            'servicioTelefonico': {'tipo': 'opcion', 'opciones': ['No', 'Una línea', 'Múltiples líneas']},
+            'servicioDeInternet': {'tipo': 'opcion', 'opciones': ['No', 'DSL', 'Fibra óptica']},
+            'seguridadEnLinea': {'tipo': 'booleano'},
+            'copiaDeSeguridadEnLinea': {'tipo': 'booleano'},
+            'proteccionDeDispositivos': {'tipo': 'booleano'},
+            'soporteTecnico': {'tipo': 'booleano'},
+            'streamingTV': {'tipo': 'booleano'},
+            'streamingDePeliculas': {'tipo': 'booleano'},
+            'tipoDeContrato': {'tipo': 'opcion', 'opciones': ['Mes a mes', 'Un año', 'Dos años']},
+            'tieneFacturaElectronica': {'tipo': 'booleano'},
+            'metodoDePago': {'tipo': 'opcion', 'opciones': ['Cheque enviado por correo', 'Cheque electrónico', 'Tarjeta de crédito (automático)', 'Transferencia bancaria (automático)']},
+            'cuentasMensuales': {'tipo': 'numero'},
+            'cobroTotal': {'tipo': 'numero'},
+        }
+    
+    def _crear_widget_texto(self, frame_campo, campo, modo, registro_existente, id_registro):
+        """Crea un widget de entrada de texto"""
+        widget = ttk.Entry(frame_campo)
+        if modo == 'actualizar' and campo == 'ID':
+            widget.insert(0, id_registro)
+            widget['state'] = 'disabled'
+        elif registro_existente:
+            widget.insert(0, registro_existente.get(campo, ''))
+        widget.pack(side='left', fill='x', expand=True)
+        return widget
+    
+    def _crear_widget_numero(self, frame_campo, campo, registro_existente):
+        """Crea un widget de entrada numérica"""
+        widget = ttk.Entry(frame_campo)
+        if registro_existente:
+            widget.insert(0, registro_existente.get(campo, ''))
+        widget.pack(side='left', fill='x', expand=True)
+        return widget
+    
+    def _crear_widget_booleano(self, frame_campo, campo, registro_existente):
+        """Crea un widget de selección booleana (Sí/No)"""
+        widget = ttk.Combobox(frame_campo, values=['Sí', 'No'], state='readonly', width=15)
+        if registro_existente:
+            valor = registro_existente.get(campo, 'No')
+            widget.set('Sí' if valor in ['True', 'true', 'Sí', '1'] else 'No')
+        else:
+            widget.set('No')
+        widget.pack(side='left')
+        return widget
+    
+    def _crear_widget_opcion(self, frame_campo, campo, config, registro_existente):
+        """Crea un widget de selección de opciones"""
+        widget = ttk.Combobox(frame_campo, values=config['opciones'], state='readonly', width=25)
+        if registro_existente:
+            widget.set(registro_existente.get(campo, config['opciones'][0]))
+        else:
+            widget.set(config['opciones'][0])
+        widget.pack(side='left')
+        return widget
+    
+    def _crear_widget_campo(self, frame_campo, campo, config, modo, registro_existente, id_registro):
+        """Crea el widget apropiado para un campo específico"""
+        label = ttk.Label(frame_campo, text=self.nombres_columnas.get(campo, campo), width=20)
+        label.pack(side='left')
+        
+        tipo = config['tipo']
+        
+        if tipo == 'texto':
+            return self._crear_widget_texto(frame_campo, campo, modo, registro_existente, id_registro)
+        elif tipo == 'numero':
+            return self._crear_widget_numero(frame_campo, campo, registro_existente)
+        elif tipo == 'booleano':
+            return self._crear_widget_booleano(frame_campo, campo, registro_existente)
+        elif tipo == 'opcion':
+            return self._crear_widget_opcion(frame_campo, campo, config, registro_existente)
+        
+        return None
+    
+    def _extraer_datos_widgets(self, widgets, campos):
+        """Extrae y convierte los datos de los widgets"""
+        datos = {}
+        for campo, widget in widgets.items():
+            valor = widget.get()
+            
+            if campos[campo]['tipo'] == 'numero':
+                datos[campo] = float(valor)
+            elif campos[campo]['tipo'] == 'booleano':
+                datos[campo] = valor == 'Sí'
+            else:
+                datos[campo] = valor
+        return datos
+    
+    def _guardar_registro(self, datos, modo, id_registro, ventana):
+        """Guarda el registro (creación o actualización)"""
+        try:
+            if modo == 'crear':
+                id_nuevo = datos['ID']
+                if leer_registro(id_nuevo):
+                    messagebox.showerror("Error", f"Ya existe un registro con ID: {id_nuevo}")
+                    return False
+                crear_registro(datos)
+                messagebox.showinfo(SUCCESS_TITLE, "Registro creado exitosamente")
+            else:
+                actualizar_registro(id_registro, datos)
+                messagebox.showinfo(SUCCESS_TITLE, "Registro actualizado exitosamente")
+            
+            ventana.destroy()
+            self.ver_todos_datos()
+            return True
+            
+        except ValueError as e:
+            messagebox.showerror("Error", f"Error en los datos: {str(e)}")
+            return False
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al guardar: {str(e)}")
+            return False
+    
+    def _ventana_registro(self, modo, registro_existente=None, id_registro=None):
+        """Crea ventana para crear o actualizar registros"""
+        ventana = tk.Toplevel(self.root)
+        ventana.title("Crear Registro" if modo == 'crear' else f"Actualizar Registro {id_registro}")
+        ventana.geometry("600x700")
+        
+        campos = self._obtener_configuracion_campos(modo)
+        widgets = {}
+        
+        for campo, config in campos.items():
+            frame_campo = ttk.Frame(ventana)
+            frame_campo.pack(fill='x', padx=10, pady=5)
+            
+            widget = self._crear_widget_campo(frame_campo, campo, config, modo, registro_existente, id_registro)
+            if widget:
+                widgets[campo] = widget
+        
+        def guardar():
+            datos = self._extraer_datos_widgets(widgets, campos)
+            self._guardar_registro(datos, modo, id_registro, ventana)
+        
+        frame_botones = ttk.Frame(ventana)
+        frame_botones.pack(fill='x', padx=10, pady=10)
+        
+        ttk.Button(frame_botones, text="Guardar", command=guardar).pack(side='left', padx=5)
+        ttk.Button(frame_botones, text="Cancelar", command=ventana.destroy).pack(side='left', padx=5)
     
     # Métodos de estadísticas
     def _mostrar_grafico_en_ventana(self, fig, titulo):
@@ -364,7 +534,7 @@ class TelecomAIApp:
         """Ejecuta el pipeline de ML en un hilo separado"""
         self.model_text.delete(1.0, tk.END)
         self.model_text.insert(tk.END, "Ejecutando pipeline de Machine Learning...\n")
-        self.model_text.insert(tk.END, "Esto puede tomar varios segundos...\n")
+        self.model_text.insert(tk.END, "Esto puede tardar unos minutos (selección de features, k-fold y sintonía)...\n")
         
         self._run_thread_safe(self.ejecutar_pipeline)
     
@@ -377,13 +547,7 @@ class TelecomAIApp:
             self.resultados_modelos = resultados
             
             self.model_text.delete(1.0, tk.END)
-            self.model_text.insert(tk.END, "=== Pipeline de Machine Learning Completado ===\n\n")
-            self.model_text.insert(tk.END, f"Accuracy Regresión Logística: {resultados['resultados_log']['accuracy']:.4f}\n")
-            self.model_text.insert(tk.END, f"Accuracy Random Forest: {resultados['resultados_rf']['accuracy']:.4f}\n\n")
-            self.model_text.insert(tk.END, "=== Reporte Regresión Logística ===\n")
-            self.model_text.insert(tk.END, resultados['resultados_log']['classification_report'])
-            self.model_text.insert(tk.END, "\n=== Reporte Random Forest ===\n")
-            self.model_text.insert(tk.END, resultados['resultados_rf']['classification_report'])
+            self.model_text.insert(tk.END, formatear_reporte_pipeline(resultados))
             
             messagebox.showinfo("Éxito", "Pipeline de ML completado exitosamente")
         except Exception as e:
@@ -402,7 +566,7 @@ class TelecomAIApp:
         """Crea ventana con visualizaciones gráficas de los modelos"""
         ventana = tk.Toplevel(self.root)
         ventana.title("Visualización de Modelos ML")
-        ventana.geometry("1000x700")
+        ventana.geometry("1100x720")
         
         # Manejar cierre de esta ventana hija
         ventana.protocol("WM_DELETE_WINDOW", lambda: self._cerrar_ventana_segura(ventana))
@@ -411,14 +575,12 @@ class TelecomAIApp:
         notebook = ttk.Notebook(ventana)
         notebook.pack(fill='both', expand=True, padx=10, pady=10)
         
-        # Pestaña 1: Comparación de Accuracy
+        self._crear_pestana_sintonia_sensibilidad(notebook)
         self._crear_pestana_comparacion_accuracy(notebook)
-        
-        # Pestaña 2: Matrices de Confusión
         self._crear_pestana_matrices_confusion(notebook)
-        
-        # Pestaña 3: Métricas Detalladas
         self._crear_pestana_metricas_detalladas(notebook)
+        self._crear_pestana_validacion_cruzada(notebook)
+        self._crear_pestana_features(notebook)
     
     def _cerrar_ventana_segura(self, ventana):
         """Cierra una ventana de forma segura limpiando recursos"""
@@ -427,27 +589,86 @@ class TelecomAIApp:
         except tk.TclError:
             pass
     
+    def _etiquetar_barras(self, grupos_barras):
+        for bars in grupos_barras:
+            for bar in bars:
+                height = bar.get_height()
+                ax_parent = bar.axes
+                ax_parent.text(
+                    bar.get_x() + bar.get_width() / 2.,
+                    height,
+                    f'{height:.3f}',
+                    ha='center', va='bottom', fontsize=8,
+                )
+
+    def _crear_pestana_sintonia_sensibilidad(self, notebook):
+        """Compara F1 (métrica de sintonía) con sensibilidad, en CV y en test."""
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text="Sintonía y Sensibilidad")
+
+        resultados = self.resultados_modelos
+        bloques = [
+            resultados['resultados_log'],
+            resultados['resultados_rf'],
+            resultados['resultados_xgb'],
+        ]
+        modelos = [MODELO_REGRESION_LOGISTICA, MODELO_RANDOM_FOREST, MODELO_XGBOOST]
+        x = np.arange(len(modelos))
+        width = 0.35
+
+        fig, (ax_cv, ax_test) = plt.subplots(1, 2, figsize=(12, 5.5))
+
+        f1_cv = [b['sintonia']['f1'] for b in bloques]
+        sens_cv = [b['sintonia']['sensibilidad'] for b in bloques]
+        bars_f1_cv = ax_cv.bar(x - width / 2, f1_cv, width, label='F1 (sintonía)', color='#6a3d9a')
+        bars_sens_cv = ax_cv.bar(x + width / 2, sens_cv, width, label=SENSIBILIDAD_RECALL, color='#ff7f0e')
+        ax_cv.set_title('Durante la sintonía (CV de la búsqueda)')
+        ax_cv.set_ylabel('Score')
+        ax_cv.set_xticks(x)
+        ax_cv.set_xticklabels(modelos, rotation=15, ha='right')
+        ax_cv.set_ylim(0, 1)
+        ax_cv.legend()
+        self._etiquetar_barras([bars_f1_cv, bars_sens_cv])
+
+        f1_test = [b['metricas']['f1'] for b in bloques]
+        sens_test = [b['metricas']['sensibilidad'] for b in bloques]
+        bars_f1_test = ax_test.bar(x - width / 2, f1_test, width, label='F1 (sintonía, test)', color='#6a3d9a')
+        bars_sens_test = ax_test.bar(x + width / 2, sens_test, width, label='Sensibilidad (Recall, test)', color='#ff7f0e')
+        ax_test.set_title('En el conjunto de prueba')
+        ax_test.set_ylabel('Score')
+        ax_test.set_xticks(x)
+        ax_test.set_xticklabels(modelos, rotation=15, ha='right')
+        ax_test.set_ylim(0, 1)
+        ax_test.legend()
+        self._etiquetar_barras([bars_f1_test, bars_sens_test])
+
+        fig.suptitle('F1 (métrica con la que se sintoniza) vs Sensibilidad (Recall de abandonadores)')
+        plt.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill='both', expand=True)
+
     def _crear_pestana_comparacion_accuracy(self, notebook):
         """Crea pestaña con comparación de accuracy entre modelos"""
         frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Comparación Accuracy")
+        notebook.add(frame, text="Comparación Exactitud (Accuracy)")
         
         resultados = self.resultados_modelos
         accuracy_log = resultados['resultados_log']['accuracy']
         accuracy_rf = resultados['resultados_rf']['accuracy']
+        accuracy_xgb = resultados['resultados_xgb']['accuracy']
         
-        # Crear gráfico de barras
         fig, ax = plt.subplots(figsize=(8, 6))
-        modelos = [MODELO_REGRESION_LOGISTICA, MODELO_RANDOM_FOREST]
-        accuracies = [accuracy_log, accuracy_rf]
-        colores = ['#1f77b4', '#ff7f0e']
+        modelos = [MODELO_REGRESION_LOGISTICA, MODELO_RANDOM_FOREST, MODELO_XGBOOST]
+        accuracies = [accuracy_log, accuracy_rf, accuracy_xgb]
+        colores = ['#1f77b4', '#ff7f0e', '#2ca02c']
         
         bars = ax.bar(modelos, accuracies, color=colores)
-        ax.set_title('Comparación de Accuracy entre Modelos')
-        ax.set_ylabel('Accuracy')
+        ax.set_title('Comparación de Exactitud (Accuracy) en test')
+        ax.set_ylabel('Exactitud (Accuracy)')
         ax.set_ylim(0, 1)
         
-        # Agregar etiquetas con valores
         for bar, acc in zip(bars, accuracies):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
@@ -468,30 +689,21 @@ class TelecomAIApp:
         
         resultados = self.resultados_modelos
         
-        # Crear subplots para las dos matrices
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-        
-        # Matriz de confusión Regresión Logística
-        cm_log = resultados['resultados_log']['confusion_matrix']
-        sns.heatmap(cm_log, annot=True, fmt='d', cmap='Blues', cbar=False, ax=ax1)
-        ax1.set_title(MODELO_REGRESION_LOGISTICA)
-        ax1.set_xlabel('Predicción')
-        ax1.set_ylabel('Realidad')
-        ax1.set_xticks([0.5, 1.5])
-        ax1.set_xticklabels([LABEL_NO_CANCELADO, LABEL_CANCELADO])
-        ax1.set_yticks([0.5, 1.5])
-        ax1.set_yticklabels([LABEL_NO_CANCELADO, LABEL_CANCELADO])
-        
-        # Matriz de confusión Random Forest
-        cm_rf = resultados['resultados_rf']['confusion_matrix']
-        sns.heatmap(cm_rf, annot=True, fmt='d', cmap='Greens', cbar=False, ax=ax2)
-        ax2.set_title('Random Forest')
-        ax2.set_xlabel('Predicción')
-        ax2.set_ylabel('Realidad')
-        ax2.set_xticks([0.5, 1.5])
-        ax2.set_xticklabels([LABEL_NO_CANCELADO, LABEL_CANCELADO])
-        ax2.set_yticks([0.5, 1.5])
-        ax2.set_yticklabels([LABEL_NO_CANCELADO, LABEL_CANCELADO])
+        fig, ejes = plt.subplots(1, 3, figsize=(15, 4.5))
+        matrices = [
+            (resultados['resultados_log']['confusion_matrix'], MODELO_REGRESION_LOGISTICA, 'Blues'),
+            (resultados['resultados_rf']['confusion_matrix'], MODELO_RANDOM_FOREST, 'Oranges'),
+            (resultados['resultados_xgb']['confusion_matrix'], MODELO_XGBOOST, 'Greens'),
+        ]
+        for ax, (cm, titulo, cmap) in zip(ejes, matrices):
+            sns.heatmap(cm, annot=True, fmt='d', cmap=cmap, cbar=False, ax=ax)
+            ax.set_title(titulo)
+            ax.set_xlabel('Predicción')
+            ax.set_ylabel('Realidad')
+            ax.set_xticks([0.5, 1.5])
+            ax.set_xticklabels([LABEL_NO_CANCELADO, LABEL_CANCELADO])
+            ax.set_yticks([0.5, 1.5])
+            ax.set_yticklabels([LABEL_NO_CANCELADO, LABEL_CANCELADO])
         
         plt.tight_layout()
         
@@ -506,50 +718,106 @@ class TelecomAIApp:
         notebook.add(frame, text="Métricas Detalladas")
         
         resultados = self.resultados_modelos
+        m_log = resultados['resultados_log']['metricas']
+        m_rf = resultados['resultados_rf']['metricas']
+        m_xgb = resultados['resultados_xgb']['metricas']
         
-        # Extraer métricas del reporte de clasificación
-        # Parsear el reporte para obtener precision, recall, f1-score
-        from sklearn.metrics import precision_recall_fscore_support
-        
-        y_test = resultados['y_test']
-        pred_log = resultados['resultados_log']['predictions']
-        pred_rf = resultados['resultados_rf']['predictions']
-        
-        # Calcular métricas para cada modelo
-        precision_log, recall_log, f1_log, _ = precision_recall_fscore_support(y_test, pred_log, average='weighted')
-        precision_rf, recall_rf, f1_rf, _ = precision_recall_fscore_support(y_test, pred_rf, average='weighted')
-        
-        # Crear gráfico comparativo de métricas
         fig, ax = plt.subplots(figsize=(10, 6))
         
-        metricas = ['Precision', 'Recall', 'F1-Score']
-        x = np.arange(len(metricas))
-        width = 0.35
+        nombres = ['Precisión (Precision)', SENSIBILIDAD_RECALL, 'Especificidad (Specificity)', 'F1 (sintonía)']
+        x = np.arange(len(nombres))
+        width = 0.25
         
-        metricas_log = [precision_log, recall_log, f1_log]
-        metricas_rf = [precision_rf, recall_rf, f1_rf]
+        metricas_log = [m_log['precision'], m_log['sensibilidad'], m_log['especificidad'], m_log['f1']]
+        metricas_rf = [m_rf['precision'], m_rf['sensibilidad'], m_rf['especificidad'], m_rf['f1']]
+        metricas_xgb = [m_xgb['precision'], m_xgb['sensibilidad'], m_xgb['especificidad'], m_xgb['f1']]
         
-        bars1 = ax.bar(x - width/2, metricas_log, width, label=MODELO_REGRESION_LOGISTICA, color='#1f77b4')
-        bars2 = ax.bar(x + width/2, metricas_rf, width, label='Random Forest', color='#ff7f0e')
+        bars1 = ax.bar(x - width, metricas_log, width, label=MODELO_REGRESION_LOGISTICA, color='#1f77b4')
+        bars2 = ax.bar(x, metricas_rf, width, label=MODELO_RANDOM_FOREST, color='#ff7f0e')
+        bars3 = ax.bar(x + width, metricas_xgb, width, label=MODELO_XGBOOST, color='#2ca02c')
         
-        ax.set_title('Comparación de Métricas por Modelo')
+        ax.set_title('Métricas en test (clase abandonador)')
         ax.set_ylabel('Score')
         ax.set_xticks(x)
-        ax.set_xticklabels(metricas)
+        ax.set_xticklabels(nombres)
         ax.legend()
         ax.set_ylim(0, 1)
         
-        # Agregar etiquetas con valores
-        for bars in [bars1, bars2]:
+        for bars in [bars1, bars2, bars3]:
             for bar in bars:
                 height = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width()/2., height,
                        f'{height:.3f}',
-                       ha='center', va='bottom', fontsize=9)
+                       ha='center', va='bottom', fontsize=8)
         
         plt.tight_layout()
         
-        # Integrar con tkinter
+        canvas = FigureCanvasTkAgg(fig, master=frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill='both', expand=True)
+    
+    def _crear_pestana_validacion_cruzada(self, notebook):
+        """Compara métricas medias de k-fold entre modelos"""
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text="Validación Cruzada")
+        
+        resultados = self.resultados_modelos
+        nombres = ['F1 (sintonía)', SENSIBILIDAD_RECALL, 'Precisión (Precision)', 'ROC-AUC']
+        claves = ['f1', 'sensibilidad', 'precision', 'roc_auc']
+        x = np.arange(len(nombres))
+        width = 0.25
+        
+        def medias(bloque):
+            return [bloque['cv'][k]['media'] for k in claves]
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bars1 = ax.bar(x - width, medias(resultados['resultados_log']), width,
+                       label=MODELO_REGRESION_LOGISTICA, color='#1f77b4')
+        bars2 = ax.bar(x, medias(resultados['resultados_rf']), width,
+                       label=MODELO_RANDOM_FOREST, color='#ff7f0e')
+        bars3 = ax.bar(x + width, medias(resultados['resultados_xgb']), width,
+                       label=MODELO_XGBOOST, color='#2ca02c')
+        
+        ax.set_title(f'Media {N_FOLDS}-fold sobre entrenamiento (modelos sintonizados)')
+        ax.set_ylabel('Score')
+        ax.set_xticks(x)
+        ax.set_xticklabels(nombres)
+        ax.legend()
+        ax.set_ylim(0, 1)
+        
+        for bars in [bars1, bars2, bars3]:
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{height:.3f}',
+                       ha='center', va='bottom', fontsize=8)
+        
+        plt.tight_layout()
+        
+        canvas = FigureCanvasTkAgg(fig, master=frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill='both', expand=True)
+    
+    def _crear_pestana_features(self, notebook):
+        """Muestra el ranking univariado y las variables seleccionadas"""
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text="Features")
+        
+        ranking = self.resultados_modelos['seleccion']['ranking']
+        seleccionadas = set(self.resultados_modelos['seleccion']['columnas'])
+        ranking = ranking.copy()
+        ranking['seleccionada'] = ranking['variable'].isin(seleccionadas)
+        
+        # Renombrar variables a nombres amigables
+        ranking['variable'] = ranking['variable'].apply(lambda x: obtener_nombre_amigable(x, es_procesada=True))
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        colores = ['#2ca02c' if sel else '#9e9e9e' for sel in ranking['seleccionada']]
+        ax.barh(ranking['variable'][::-1], ranking['f_score'][::-1], color=colores[::-1])
+        ax.set_title('Ranking F-score (verde = seleccionada por SelectFromModel)')
+        ax.set_xlabel('F-score (ANOVA)')
+        plt.tight_layout()
+        
         canvas = FigureCanvasTkAgg(fig, master=frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill='both', expand=True)
