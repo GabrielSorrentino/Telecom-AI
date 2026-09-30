@@ -130,77 +130,222 @@ docker run --rm \
     telecom-ai:latest
 ```
 
-## Funcionalidades de la Aplicación
+## 🎯 Funcionalidades de la Aplicación
 
-La interfaz gráfica se organiza en cuatro pestañas principales:
+La interfaz se organiza en **cuatro pestañas principales**:
 
-### 1. Gestión de Datos
-- **Ver Todos los Datos**: Muestra el contenido completo del CSV en formato tabular
-- **Buscar por ID**: Permite buscar un cliente específico por su identificador
-- **Crear Registro**: Funcionalidad para agregar nuevos clientes al sistema
-- **Actualizar Registro**: Permite modificar información de clientes existentes
-- **Eliminar Registro**: Elimina clientes del sistema por ID
+### 1️⃣ **Gestión de Datos**
+Aquí puedes trabajar directamente con el registro de clientes:
+- **Ver todos los datos**: Visualiza la tabla completa de clientes
+- **Buscar por ID**: Encuentra un cliente específico rápidamente
+- **Crear registro**: Agrega nuevos clientes al sistema
+- **Actualizar registro**: Modifica información de clientes existentes
+- **Eliminar registro**: Borra clientes del sistema
 
-### 2. Estadísticas
-- **Análisis Descriptivo**: Muestra estadísticas básicas (media, desviación estándar, cuartiles, etc.) de las variables numéricas
-- **Distribución de Cancelación**: Gráfico de barras mostrando la proporción de clientes que cancelaron vs. los que permanecieron
-- **Gráficos Categóricos**: Visualizaciones de cancelación por:
-  - Género
-  - Tipo de contrato
-  - Método de pago
-  - Antigüedad
-  - Jubilación
-  - Tipo de servicio de internet
-- **Gráficos de Costos**: Análisis de cancelación en relación con costos mensuales y cobros totales
+### 2️⃣ **Estadísticas**
+Este es el corazón del **análisis exploratorio**. Aquí vemos **cómo se comporta la cancelación en diferentes grupos**:
 
-### 3. Modelos ML
-- **Ejecutar Pipeline Completo**: Proceso automatizado que:
-  - Preprocesa los datos (encoding, estandarización)
-  - Elimina variables con alta multicolinealidad
-  - Entrena dos modelos: Regresión Logística y Random Forest
-  - Evalúa ambos modelos con métricas de performance
-  - Muestra matrices de confusión y reportes de clasificación
+#### 📊 Análisis Descriptivo
+Muestra estadísticas básicas (promedio, desviación estándar, mínimo, máximo, etc.) de las variables numéricas del dataset.
 
-### 4. Visualizaciones
-- **Dashboard Completo**: Genera todas las visualizaciones principales en un solo proceso
-- **Matriz de Correlación**: Heatmap interactivo mostrando correlaciones entre variables
-- **Boxplots**: Análisis de distribución de variables numéricas vs. cancelación
-- **Scatter Plots**: Diagramas de dispersión para identificar patrones en los datos
-- **Importancia de Variables**: Visualización de qué factores más influyen en la cancelación
+#### 📈 Distribución General de Cancelación
+Gráfico de barras mostrando:
+- Cuántos clientes cancelaron vs. cuántos se quedaron
+- Porcentaje de cancelación en la base de datos
+- Ayuda a entender si hay más clientes leales o desertores
 
-## Modelos de Machine Learning
+#### 🔍 Gráficos Categóricos (Qué influye en la cancelación)
+Cada uno de estos gráficos te muestra **cómo cambia la cancelación según una característica específica**:
 
-La aplicación implementa y compara dos modelos predictivos:
+1. **Por Género**: ¿Hay diferencia entre hombres y mujeres?
+2. **Por Tipo de Contrato**: ¿Los contratos de corto plazo tienen más cancelaciones?
+3. **Por Método de Pago**: ¿El pago automático retiene mejor que el manual?
+4. **Por Antigüedad**: ¿Los clientes nuevos se van más que los antiguos?
+5. **Por Jubilación**: ¿Los jubilados se comportan diferente?
+6. **Por Servicio de Internet**: ¿El tipo de internet (DSL, Fibra, etc.) importa?
 
-### Regresión Logística
-- Modelo lineal enfocado en explicabilidad
-- Calcula probabilidades de cancelación
-- Ideal para entender qué factores influyen en la decisión del cliente
-- Alto recall (sensibilidad) para detectar clientes en riesgo
+#### 💰 Gráficos de Costos (El dinero importa)
+- **Por Costo Mensual**: ¿Clientes que pagan más se van más?
+- **Por Cobro Total**: ¿La inversión histórica del cliente predice su permanencia?
 
-### Random Forest Classifier
-- Modelo de ensamble basado en árboles de decisión
-- Capaz de capturar relaciones no lineales complejas
-- Mayor accuracy general
-- Útil para patrones complejos en los datos
+### 3️⃣ **Modelos ML** ⚡
+Aquí entramos en machine learning. Este módulo **entrena y compara tres modelos inteligentes**:
 
-## Hallazgos Principales del Análisis
+#### 🤖 Los Tres Modelos:
 
-Basado en el análisis de los datos y los modelos entrenados, los principales factores que influyen en la cancelación de servicios son:
+1. **Regresión Logística** (La simple y explicable)
+   - Es como un "profesor de matemáticas": muy ordenado, fácil de entender
+   - Te dice exactamente cuáles factores ayudan a retener clientes
+   - Es rápida y buena para empezar
 
-1. **Alto costo mensual**: Los clientes con planes más costosos (especialmente fibra óptica) tienen mayor probabilidad de cancelar
-2. **Contratos de mes a mes**: La falta de compromiso a largo plazo facilita la salida rápida de clientes
-3. **Falta de servicios de valor agregado**: La ausencia de soporte técnico y seguridad online incrementa el riesgo de cancelación
-4. **Antigüedad reducida**: Los clientes nuevos (primeros meses) son los más propensos a abandonar el servicio
+2. **Random Forest** (La democracia de árboles)
+   - Es como tener 80+ "árboles de decisión" votando juntos
+   - Detecta relaciones más complejas que la regresión lineal
+   - Mejor precisión general
 
-## Recomendaciones de Negocio
+3. **XGBoost** (La más avanzada)
+   - Es como un estudiante aplicado que aprende de sus errores
+   - Entrena árboles secuencialmente, corrigiendo errores anteriores
+   - Generalmente la mejor predicción
 
-- Revisar la infraestructura técnica de la fibra óptica para mejorar la calidad del servicio
-- Considerar estrategias de retención para contratos de mes a mes
-- Bonificar servicios de seguridad y soporte técnico para clientes de planes premium
-- Implementar programas de bienvenida específicos para nuevos clientes
-- Desarrollar encuestas para entender mejor las necesidades de clientes jubilados
+#### 📊 Qué se evalúa de cada modelo:
 
-## Autor y Contacto
+El pipeline completo incluye:
 
-Desarrollado como proyecto académico para la materia de Inteligencia Artificial en la Universidad Nacional de la Patagonia San Juan Bosco, Sede Puerto Madryn.
+**Durante la búsqueda de parámetros (Sintonía):**
+- Prueba cientos de combinaciones de parámetros
+- Usa validación cruzada de 5-fold para asegurar que funcione bien en datos nuevos
+- Elige la combinación que maximiza el F1 (balance entre precisión y sensibilidad)
+
+**Evaluación Final (en los datos de prueba):**
+- **Exactitud (Accuracy)**: De cada 100 predicciones, ¿cuántas aciertan?
+- **Precisión**: Cuando dice "este cliente se va", ¿qué tan seguido tiene razón?
+- **Sensibilidad (Recall)**: De todos los clientes que realmente se fueron, ¿cuántos logró identificar? (crucial para negocios)
+- **Especificidad**: De los clientes que se quedaron, ¿cuántos identificó correctamente?
+- **F1**: Balance perfecto entre precisión y sensibilidad
+- **ROC-AUC**: Medida general de calidad del modelo
+
+**Matriz de Confusión:**
+Muestra cuatro categorías:
+- **Verdaderos Positivos (VP)**: Predijo cancelación y canceló ✓
+- **Falsos Positivos (FP)**: Predijo cancelación pero se quedó ✗
+- **Falsos Negativos (FN)**: No predijo cancelación pero se fue ✗ (lo peor)
+- **Verdaderos Negativos (VN)**: Predijo que se queda y se quedó ✓
+
+### 4️⃣ **Visualizaciones** 🎨
+Gráficos avanzados para entender los datos en profundidad:
+
+- **Matriz de Correlación**: Heatmap mostrando qué variables están relacionadas entre sí y cuáles más influyen en la cancelación
+- **Boxplots**: Compara la distribución de variables numéricas entre clientes que cancelaron vs. los que se quedaron
+- **Scatter Plots**: Diagrama de dispersión mostrando la relación entre antigüedad y costo mensual, coloreado por cancelación
+- **Importancia de Variables**: Barra de cuáles son los factores más determinantes para cada modelo
+
+---
+
+## 🧠 Modelos de Machine Learning Explicados
+
+### **Regresión Logística**
+- **¿Para qué?** Predicción rápida y explicable
+- **¿Cuándo usarla?** Cuando necesitas entender el "por qué"
+- **Ventaja:** Cada coeficiente te dice cuánto influye cada factor
+- **Limitación:** Solo captura relaciones lineales
+
+### **Random Forest**
+- **¿Para qué?** Predicción con buena precisión general
+- **¿Cuándo usarla?** Cuando necesitas equilibrio entre precisión y velocidad
+- **Ventaja:** Detecta relaciones complejas y no lineales
+- **Limitación:** Menos interpretable que regresión logística
+
+### **XGBoost**
+- **¿Para qué?** Máxima precisión predictiva
+- **¿Cuándo usarla?** Cuando necesitas el mejor rendimiento posible
+- **Ventaja:** Generalmente el más preciso de los tres
+- **Limitación:** Más lento que los otros y más "caja negra"
+
+---
+
+## 💡 Hallazgos Principales del Análisis
+
+Basado en el análisis de los datos y los modelos entrenados, los principales factores que influyen en la cancelación son:
+
+1. **Alto costo mensual** ⚠️
+   - Clientes con planes más costosos (especialmente fibra óptica) tienen mayor probabilidad de cancelar
+   - Posible causa: precio-calidad percibida
+
+2. **Contratos de mes a mes** 📅
+   - La falta de compromiso a largo plazo facilita la salida rápida
+   - Estos clientes son menos "pegajosos"
+
+3. **Falta de servicios de valor agregado** 🔧
+   - Ausencia de soporte técnico y seguridad online incrementa el riesgo
+   - Los extras retienen clientes
+
+4. **Antigüedad reducida** 🆕
+   - Clientes nuevos (primeros meses) son los más propensos a abandonar
+   - Los primeros 3 meses son críticos
+
+5. **Jubilados sin opciones** 👴
+   - Clientes mayores jubilados tienen patrones especiales de comportamiento
+   - Necesitan atención específica
+
+---
+
+## 🎯 Recomendaciones de Negocio
+
+📌 **Para retener clientes:**
+
+1. **Revisar la infraestructura de fibra óptica**
+   - Si el servicio es caro pero la calidad es mala, arreglarlo es urgente
+   - Considera revisiones de velocidad/estabilidad
+
+2. **Estrategias especiales para contratos de mes a mes**
+   - Incentiva upgrading a contratos de 1 o 2 años
+   - Ofrece descuentos por permanencia más larga
+
+3. **Empaquetar servicios de seguridad**
+   - Bonifica soporte técnico y seguridad online para clientes de planes premium
+   - Aumenta el valor percibido del servicio
+
+4. **Programa de bienvenida agresivo**
+   - Implementa actividades especiales para nuevos clientes (primeros 3 meses)
+   - Contacto proactivo, ofertas especiales, etc.
+
+5. **Encuestas dirigidas a jubilados**
+   - Entiende mejor sus necesidades específicas
+   - Desarrolla paquetes personalizados para este segmento
+
+---
+
+## 📦 Dependencias
+
+```
+pandas          # Manipulación y análisis de datos
+matplotlib      # Visualización gráfica
+seaborn         # Gráficos estadísticos mejorados
+scikit-learn    # Modelos de ML y métricas
+xgboost         # Modelo XGBoost
+numpy           # Operaciones numéricas
+tkinter         # Interfaz gráfica
+```
+
+Instálalas todas con:
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 📄 Archivos Principales
+
+| Archivo | Descripción |
+|---------|-------------|
+| `main.py` | Punto de entrada - ejecuta la aplicación gráfica |
+| `crud_service.py` | Operaciones CRUD sobre el CSV |
+| `estadisticas.py` | Gráficos estadísticos y descriptivos |
+| `modelo_service.py` | Pipeline completo de ML (el más importante) |
+| `visualizaciones.py` | Gráficos avanzados y matrices |
+| `nombres_variables.py` | Mapeo de nombres técnicos a nombres amigables |
+| `Telecom_AI.csv` | Base de datos de clientes |
+| `requirements.txt` | Dependencias del proyecto |
+| `Dockerfile` | Configuración para ejecutar con Docker |
+| `telecom.sh` / `telecom.ps1` | Scripts para ejecutar con Docker |
+
+---
+
+## 🔄 Flujo de Trabajo Típico
+
+1. **Exploración**: Abre la pestaña "Estadísticas" para entender los datos
+2. **Análisis**: Revisa "Visualizaciones" para ver relaciones complejas
+3. **Predicción**: Ejecuta "Modelos ML" para entrenar los tres modelos
+4. **Decisión**: Compara resultados y elige el modelo más confiable
+5. **Acción**: Usa las recomendaciones para implementar estrategias de retención
+
+---
+
+## 👨‍💻 Autor
+
+Desarrollado como proyecto académico para la materia **Inteligencia Artificial** en la:
+
+**Universidad Nacional de la Patagonia San Juan Bosco**  
+Sede Puerto Madryn  
+Patagonia, Argentina 🇦🇷
